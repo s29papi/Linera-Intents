@@ -1,0 +1,33 @@
+[workspace]
+members = [
+  "intents-chain/shared_types",
+  "intents-chain/token_factory",
+  "intents-chain/matching_engine",
+  "intents-chain/faucet",
+  "intents-chain/fungible_token",
+  "template/template_fungible",
+  "scripts/gen_keypair"
+]
+
+resolver = "2"
+
+[workspace.dependencies]
+async-graphql = { version = "=7.0.17", default-features = false }
+async-graphql-value = { version = "=7.0.17", default-features = false }
+async-graphql-derive = { version = "=7.0.17", default-features = false }
+async-graphql-parser = { version = "=7.0.17", default-features = false }
+linera-sdk = "0.15.8"
+linera-base = "0.15.10"
+futures = { version = "0.3 "}
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = { version = "1.0.93" }
+
+[workspace.dev-dependencies]
+linera-sdk = { version = "0.15.8", features = ["test", "wasmer"] }
+tokio = { version = "1.25.0", features = ["macros", "rt-multi-thread"] }
+
+[profile.release]
+debug = true
+lto = true
+opt-level = 'z'
+strip = 'debuginfo'
