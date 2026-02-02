@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = [
+  "shared_types",
+  "token_factory",
+  "matching_engine",
+  "faucet",
+  "fungible_token",
+]

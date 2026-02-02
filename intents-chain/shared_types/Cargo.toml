@@ -1,0 +1,11 @@
+[package]
+name = "shared_types"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-graphql = { version = "=7.0.17", default-features = false }
+async-graphql-value = { version = "=7.0.17", default-features = false }
+linera-base = "=0.15.10"
+linera-sdk = "=0.15.8"
+serde = { version = "1.0.152", features = ["derive"] }

@@ -1,0 +1,21 @@
+[package]
+name = "fungible_token"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-graphql = { version = "=7.0.17", default-features = false }
+async-graphql-value = { version = "=7.0.17", default-features = false }
+hex = "0.4"
+linera-base = "=0.15.10"
+linera-sdk = "=0.15.8"
+serde = { version = "1.0.152", features = ["derive"] }
+shared_types = { path = "../shared_types" }
+
+[[bin]]
+name = "fungible_token_contract"
+path = "src/contract.rs"
+
+[[bin]]
+name = "fungible_token_service"
+path = "src/service.rs"

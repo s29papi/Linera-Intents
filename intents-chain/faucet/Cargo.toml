@@ -1,0 +1,20 @@
+[package]
+name = "faucet"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-graphql = { version = "=7.0.17", default-features = false }
+async-graphql-value = { version = "=7.0.17", default-features = false }
+linera-sdk = "=0.15.8"
+linera-base = "=0.15.10"
+serde = { version = "1.0.152", features = ["derive"] }
+fungible_token = { path = "../fungible_token" }
+
+[[bin]]
+name = "faucet_contract"
+path = "src/contract.rs"
+
+[[bin]]
+name = "faucet_service"
+path = "src/service.rs"

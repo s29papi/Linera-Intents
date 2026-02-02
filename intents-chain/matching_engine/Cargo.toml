@@ -1,0 +1,23 @@
+[package]
+name = "matching_engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-graphql = { version = "=7.0.17", default-features = false }
+async-graphql-value = { version = "=7.0.17", default-features = false }
+hex = "0.4"
+linera-sdk = "=0.15.8"
+linera-base = "=0.15.10"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.93"
+shared_types = { path = "../shared_types" }
+fungible_token = { path = "../fungible_token" }
+
+[[bin]]
+name = "matching_engine_contract"
+path = "src/contract.rs"
+
+[[bin]]
+name = "matching_engine_service"
+path = "src/service.rs"
