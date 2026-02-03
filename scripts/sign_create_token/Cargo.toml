@@ -1,0 +1,15 @@
+[package]
+name = "sign_create_token"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+bcs = "0.1"
+hex = "0.4"
+serde_json = "1"
+shared_types = { path = "../../intents-chain/shared_types" }
+fungible_token = { path = "../../intents-chain/fungible_token" }
+linera-base = "0.15.10"
+
+[workspace]

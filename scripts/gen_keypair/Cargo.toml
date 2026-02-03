@@ -1,0 +1,9 @@
+[package]
+name = "gen_keypair"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+linera-base = { workspace = true }
+rand = "0.8"
+serde_json = { workspace = true }

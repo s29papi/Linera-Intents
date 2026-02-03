@@ -1,0 +1,14 @@
+/home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/deps/libthiserror-0bb73c1a4899d3c9.rmeta: /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/build/thiserror-f1c7f51854668c4b/out/private.rs
+
+/home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/deps/libthiserror-0bb73c1a4899d3c9.rlib: /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/build/thiserror-f1c7f51854668c4b/out/private.rs
+
+/home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/deps/thiserror-0bb73c1a4899d3c9.d: /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/build/thiserror-f1c7f51854668c4b/out/private.rs
+
+/home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs:
+/home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs:
+/home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs:
+/home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs:
+/home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs:
+/home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/build/thiserror-f1c7f51854668c4b/out/private.rs:
+
+# env-dep:OUT_DIR=/home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/build/thiserror-f1c7f51854668c4b/out

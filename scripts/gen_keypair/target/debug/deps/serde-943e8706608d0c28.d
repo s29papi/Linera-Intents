@@ -1,0 +1,14 @@
+/home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/deps/libserde-943e8706608d0c28.rmeta: /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/build/serde-5e8beaf81f51f4f1/out/private.rs
+
+/home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/deps/libserde-943e8706608d0c28.rlib: /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/build/serde-5e8beaf81f51f4f1/out/private.rs
+
+/home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/deps/serde-943e8706608d0c28.d: /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/build/serde-5e8beaf81f51f4f1/out/private.rs
+
+/home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/usih/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/build/serde-5e8beaf81f51f4f1/out/private.rs:
+
+# env-dep:OUT_DIR=/home/usih/go/src/github.com/searchbox-labs/hello_app/scripts/gen_keypair/target/debug/build/serde-5e8beaf81f51f4f1/out
