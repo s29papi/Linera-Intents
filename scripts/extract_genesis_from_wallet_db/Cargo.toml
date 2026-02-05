@@ -1,0 +1,24 @@
+[package]
+name = "extract_genesis_from_wallet_db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+bcs = "0.1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+# IMPORTANT: The RocksDB on-disk encoding is versioned by the Linera protocol crates.
+# Pin to the same version as the `linera` binary that produced `wallet.db` (v0.15.5 in our logs).
+linera-base = "=0.15.5"
+linera-execution = "=0.15.5"
+linera-storage = { version = "=0.15.5", features = ["rocksdb"] }
+linera-views = { version = "=0.15.5", features = ["rocksdb"] }
+linera-views-derive = "=0.15.5"
+linera-witty = "=0.15.5"
+linera-witty-macros = "=0.15.5"
+
+[workspace]

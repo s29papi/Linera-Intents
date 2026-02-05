@@ -7,6 +7,22 @@ die() {
   exit 1
 }
 
+ensure_node() {
+  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    return 0
+  fi
+
+  # Dockerfile installs Node via nvm; ensure it's on PATH for non-interactive shells.
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [[ -s "${NVM_DIR}/nvm.sh" ]]; then
+    # shellcheck disable=SC1090
+    . "${NVM_DIR}/nvm.sh"
+  fi
+
+  command -v node >/dev/null 2>&1 || die "node not found (nvm not loaded?)"
+  command -v npm >/dev/null 2>&1 || die "npm not found (nvm not loaded?)"
+}
+
 # Run Linera GraphQL service using host-provided files mounted at /build.
 export LINERA_STORAGE="${LINERA_STORAGE:-rocksdb:/tmp/linera-wallet.db}"
 USE_EMBEDDED_KEYSTORE="${USE_EMBEDDED_KEYSTORE:-1}"
@@ -22,6 +38,12 @@ DEFAULT_OWNER="0x49c2f87001ec3e39ea5a4dbd115e404c4d4a4641e83c9a60dc3d9e77778f72c
 DEFAULT_PROPOSER_BYTES='[123,34,69,100,50,53,53,49,57,34,58,34,100,53,54,48,102,97,53,98,56,98,97,98,48,56,99,55,53,52,101,97,48,56,52,52,97,100,48,50,57,55,98,97,49,98,48,49,55,101,51,99,98,52,56,99,52,99,55,54,50,57,54,49,52,52,55,49,99,97,100,97,101,53,51,49,34,125]'
 
 OWNER="${OWNER:-${DEFAULT_OWNER}}"
+
+# Frontend (Next.js) - optional.
+RUN_FRONTEND="${RUN_FRONTEND:-1}"
+FRONTEND_DIR="${FRONTEND_DIR:-/build/frontend}"
+FRONTEND_HOST="${FRONTEND_HOST:-0.0.0.0}"
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 
 # Ephemeral wallet file inside the container.
 WALLET_PATH="${WALLET_PATH:-/tmp/chain.json}"
@@ -101,4 +123,42 @@ PY
 
 linera --storage "${STORAGE_FULL}" --wallet "${WALLET_PATH}" wallet set-default "${CHAIN_ID}"
 
-linera --storage "${STORAGE_FULL}" --wallet "${WALLET_PATH}" --keystore "${LINERA_KEYSTORE}" service --port 8080
+svc_pid=""
+fe_pid=""
+
+linera --storage "${STORAGE_FULL}" --wallet "${WALLET_PATH}" --keystore "${LINERA_KEYSTORE}" \
+  service --port 8080 &
+svc_pid="$!"
+
+if [[ "${RUN_FRONTEND}" == "1" ]]; then
+  [[ -d "${FRONTEND_DIR}" ]] || die "Missing frontend dir at ${FRONTEND_DIR}"
+  ensure_node
+
+  if [[ ! -d "${FRONTEND_DIR}/node_modules" ]]; then
+    die "Missing ${FRONTEND_DIR}/node_modules. Run `npm ci` in ./frontend on the host (recommended), then restart."
+  fi
+
+  (
+    cd "${FRONTEND_DIR}"
+    npm run dev:docker -- -p "${FRONTEND_PORT}" -H "${FRONTEND_HOST}"
+  ) &
+  fe_pid="$!"
+fi
+
+if [[ -n "${fe_pid}" ]]; then
+  wait -n "${svc_pid}" "${fe_pid}"
+  status="$?"
+else
+  wait "${svc_pid}"
+  status="$?"
+fi
+
+# If either process exits, stop the other (so `docker compose up` doesn't hang).
+if [[ -n "${svc_pid}" ]]; then
+  kill "${svc_pid}" 2>/dev/null || true
+fi
+if [[ -n "${fe_pid}" ]]; then
+  kill "${fe_pid}" 2>/dev/null || true
+fi
+
+exit "${status}"
