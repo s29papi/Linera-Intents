@@ -8,6 +8,6 @@ services:
     - "13001:13001" # shard
     environment:
       FAUCET_URL: ${FAUCET_URL:-https://faucet.testnet-conway.linera.net}
-      CHAIN_ID: ${CHAIN_ID}
+      CHAIN_ID: ${CHAIN_ID:-761f62d709008c57a8eafb9d374522aa13f0a87b68ec4221861c73e0d1b67ced}
     volumes:
     - .:/build

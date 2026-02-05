@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { keccak_256 } from '@noble/hashes/sha3';
 
 const TEXT_ENCODER = new TextEncoder();
@@ -22,6 +22,17 @@ function bytesToHex(bytes: Uint8Array) {
   return Array.from(bytes)
     .map((value) => value.toString(16).padStart(2, '0'))
     .join('');
+}
+
+function formatWalletLabel(address: string) {
+  const trimmed = address.trim();
+  if (!trimmed) {
+    return '';
+  }
+  if (trimmed.length <= 12) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`;
 }
 
 function hexToBytes(hex: string) {
@@ -121,8 +132,8 @@ function encodeEvmAccountSignature(signatureHex: string, address: string) {
 }
 
 const defaultForm = {
-  tokenName: 'Test',
-  tokenSymbol: 'TST',
+  tokenName: '',
+  tokenSymbol: '',
   description: '',
   owner: '0x49c2f87001ec3e39ea5a4dbd115e404c4d4a4641e83c9a60dc3d9e77778f72c1',
   signature: '',
@@ -139,6 +150,21 @@ export default function Home() {
   const [result, setResult] = useState<string>('');
   const [walletAddress, setWalletAddress] = useState<string>('');
   const [walletStatus, setWalletStatus] = useState<string>('');
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
+  const walletMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      if (!walletMenuRef.current) {
+        return;
+      }
+      if (!walletMenuRef.current.contains(event.target as Node)) {
+        setWalletMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   async function connectWallet() {
     setWalletStatus('');
@@ -234,15 +260,57 @@ export default function Home() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function handleWalletButtonClick() {
+    if (!walletAddress) {
+      void connectWallet();
+      return;
+    }
+    setWalletMenuOpen((open) => !open);
+  }
+
+  function disconnectWallet() {
+    setWalletAddress('');
+    setWalletStatus('');
+    setWalletMenuOpen(false);
+    updateField('owner', defaultForm.owner);
+    updateField('signature', '');
+  }
+
   return (
-    <main className="min-h-screen px-6 py-16">
+    <main className="relative min-h-screen px-6 py-16">
+      <div className="absolute right-6 top-6 z-10 flex items-center gap-3">
+        <a
+          href="/faucet"
+          className="rounded-xl border border-slate-700/80 bg-slate-950/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-brand/70 hover:text-brand"
+        >
+          wLin Faucet
+        </a>
+        <div ref={walletMenuRef} className="relative">
+          <button
+            type="button"
+          onClick={handleWalletButtonClick}
+          className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-brand-dark"
+        >
+          {walletAddress ? formatWalletLabel(walletAddress) : 'Connect Wallet'}
+        </button>
+        {walletAddress && walletMenuOpen ? (
+          <div className="absolute right-0 mt-2 w-40 rounded-xl border border-slate-800/80 bg-slate-950/95 p-2 shadow-xl">
+            <button
+              type="button"
+              onClick={disconnectWallet}
+              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:bg-slate-900/60"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : null}
+        </div>
+      </div>
       <section className="mx-auto w-full max-w-4xl rounded-3xl border border-slate-800/70 bg-slate-950/90 p-10 shadow-glow">
         <div className="text-center">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Launchpad</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Linad.fun</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-[0.18em] text-brand">LAUNCH YOUR TOKEN</h1>
-          <p className="mt-3 text-sm text-slate-400">
-            Create a token using the exact GraphQL mutation wired in <span className="text-slate-200">cli.sh</span>.
-          </p>
+          <p className="mt-3 text-sm text-slate-400">Create a token on Linera's Linad Chain</p>
         </div>
 
         <form onSubmit={submitToken} className="mt-10 grid gap-6">
@@ -261,6 +329,7 @@ export default function Home() {
                   className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/30"
                   value={form.tokenName}
                   onChange={(event) => updateField('tokenName', event.target.value)}
+                  placeholder="Enter a token name..."
                   required
                 />
               </div>
@@ -270,6 +339,7 @@ export default function Home() {
                   className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/30"
                   value={form.tokenSymbol}
                   onChange={(event) => updateField('tokenSymbol', event.target.value)}
+                  placeholder="Enter a token symbol..."
                   required
                 />
               </div>
@@ -282,20 +352,8 @@ export default function Home() {
               className="min-h-[120px] rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/30"
               value={form.description}
               onChange={(event) => updateField('description', event.target.value)}
+              placeholder="Tell the world a statement about the token..."
             />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="grid gap-2">
-              <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Raised Token</label>
-              <select className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-slate-200">
-                <option>wLin</option>
-              </select>
-            </div>
-            <div className="grid gap-2">
-              <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Raised Amount</label>
-              <input className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm" placeholder="Optional" />
-            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -338,19 +396,11 @@ export default function Home() {
                 <div className="flex flex-wrap gap-3">
                   <button
                     type="button"
-                    onClick={connectWallet}
-                    className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-brand-dark"
-                  >
-                    {walletAddress ? 'Wallet Connected' : 'Connect MetaMask'}
-                  </button>
-                  <button
-                    type="button"
                     onClick={signWithMetaMask}
                     className="rounded-xl border border-brand/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-brand transition hover:bg-brand/10"
                   >
                     Sign Payload
                   </button>
-                  {walletStatus ? <span className="text-xs text-slate-400">{walletStatus}</span> : null}
                 </div>
               </div>
               <div className="grid gap-2">
