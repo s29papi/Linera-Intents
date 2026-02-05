@@ -1,25 +1,17 @@
-# Linera buildathon submission template
+# Linad Linera buildathon submission
 
-This template provides a Docker container with all the necessary
-dependencies to build and run a local Linera application against a
-local network.
+This repo provides a Docker setup with all the necessary dependencies to build and run a local Linera application against the Linera test network.
 
-If you want to submit an app running against a local network, please
-use this template.  If you have provided a link to a live demo running
-against the testnet, you do not need to use this template (but it may
-be helpful anyway!).
+`run.bash` runs this app against the Linera testnet (testnet-conway): it starts a Linera GraphQL backend (`linera service`) that talks to the testnet validators (e.g. `grpcs:validator-*.testnet-conway.linera.net:443`, with genesis config derived from the testnet faucet at `https://faucet.testnet-conway.linera.net`), and it also starts the Next.js frontend on port 5173.
+
+Demo:
 
 ## Structure
 
-The template provides a `Dockerfile` describing a container with all the
-necessary dependencies for Linera backend and frontend development, as
-well as a simple `compose.yaml` file for Docker Compose that mounts
-the current directory at `/build` and exposes the following ports:
+This repo includes a `Dockerfile` with the dependencies needed for Linera + frontend development, plus a `compose.yaml` that mounts the repo at `/build` and exposes the following ports:
 
 - 5173: the frontend of your application (optional)
-- 8080: the Linera faucet
-- 9001: the localnet validator's proxy
-- 13001: the localnet validator itself
+- 8080: the Linera GraphQL backend (`linera service`; it serves GraphQL to the frontend and acts as a client to validators)
 
 Please keep this port structure, and make sure the `Dockerfile` or the
 `compose.yaml` defines a reasonable healthcheck for your app (the
@@ -28,9 +20,12 @@ Other internal structure is optional; feel free to change it.
 
 ## Usage
 
-To get started, fill in `run.bash` with instructions to build and run
-your backend and (if applicable) frontend.
+Start the app with:
 
-To test that your submission works, run `docker compose up
---force-recreate` and access your application frontend at
-`localhost:5173`.
+```bash
+docker compose up --force-recreate
+```
+
+Then open:
+- Frontend: `http://127.0.0.1:5173`
+- Linera GraphQL (GraphiQL): `http://127.0.0.1:8080`
