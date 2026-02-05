@@ -15,8 +15,15 @@ We built it this way because Linera lets multiple apps live on a single chain wh
 
 ## Deliverables
 
+### Deployments
+
+- `Testnet CHAIN_ID` — `761f62d709008c57a8eafb9d374522aa13f0a87b68ec4221861c73e0d1b67ced`
+- `TOKEN_FACTORY_APP_ID` — `ff081619d9553ae6919dd0ed2268cd1ad988140275701136fe54805d31027990`
+- `MATCHING_ENGINE_APP_ID` — `d3f86c75ffb1f389531b93def776a4de877e4b23ea58b348746f4fce910a31be`
+- `FAUCET_APP_ID` — `5531238ece651244a3dfab368d5f9ae7c0fe5641c2fc70384e75ef3a427fd1f1`
+- `WLIN_APP_ID` — `6a570896ff23d7a1db44398bae8b2ad12101af56cd244a7d694ed94ead048731`
+
 ## Whats Next ?
 
 - Host the app to provide a stable live URL.
 - Continue product development driven by real user needs and feedback.
-
