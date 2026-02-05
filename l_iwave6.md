@@ -15,7 +15,7 @@ We built it this way because Linera lets multiple apps live on a single chain wh
 
 ## Deliverables
 
-### Deployments
+### Testnet Deployments
 
 - `Testnet CHAIN_ID` — `761f62d709008c57a8eafb9d374522aa13f0a87b68ec4221861c73e0d1b67ced`
 - `TOKEN_FACTORY_APP_ID` — `ff081619d9553ae6919dd0ed2268cd1ad988140275701136fe54805d31027990`
