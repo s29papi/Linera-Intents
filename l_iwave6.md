@@ -26,56 +26,47 @@ We built it this way because Linera lets multiple apps live on a single chain wh
 ### Architecture
 
 ```mermaid
-flowchart LR
-  %% --- Client side ---
-  U[User] --> FE[Next.js Frontend<br/>Launchpad / Explore / Token Details]
-  U --> MM[MetaMask<br/>secp256k1 signatures]
+graph LR
+  %% Client
+  U[User] --> FE[Next.js Frontend]
+  U --> MM[MetaMask]
+  FE --> MM
 
-  FE -->|connect + sign payloads| MM
+  %% Backend entrypoint
+  FE --> GQL[Linera GraphQL Service]
 
-  %% --- Backend entrypoint ---
-  FE -->|HTTP GraphQL 8080| GQL[Linera GraphQL Service<br/>linera service]
+  %% Linera runtime / storage / network
+  GQL --> DB[(RocksDB wallet.db table_linera)]
+  GQL --> VALS[(Linera Testnet Validators)]
 
-  %% --- Linera runtime / storage / network ---
-  GQL -->|reads and writes local state| DB[(RocksDB<br/>wallet.db / table_linera)]
-  GQL -->|sync certs and blobs, quorum| VALS[(Linera Testnet Validators)]
-
-  %% --- On-chain: single chain hosting multiple apps ---
-  subgraph CHAIN["Linera Testnet Chain<br/>CHAIN_ID = 761f62...67ced"]
-    direction TB
-
-    TF[Token Factory Contract<br/>(createToken)]
-    ME[Matching Engine Contract<br/>(pool + buy/sell settlement)]
-    WLIN[WLIN Fungible Token Contract<br/>(mint/transfer/approve)]
-    TOK[Per-Token Fungible Token Contract<br/>(one app instance per symbol)]
+  %% On-chain: single chain hosting multiple apps
+  subgraph CHAIN[Linera Testnet Chain 761f62...67ced]
+    TF[Token Factory Contract createToken]
+    ME[Matching Engine Contract pool and trade]
+    WLIN[WLIN Fungible Token Contract]
+    TOK[Per-Token Fungible Token Contract]
   end
 
-  %% --- How the service reaches contracts ---
+  %% Service -> contracts
   GQL --> TF
   GQL --> ME
   GQL --> WLIN
   GQL --> TOK
 
-  %% --- Create token path ---
-  FE -->|createToken, signed| GQL
-  TF -->|publish module once; create per-token app instance| TOK
-  TF -->|register symbol and tokenAppId, store pool config| ME
+  %% Create token path
+  TF --> TOK
+  TF --> ME
 
-  %% --- Faucet path (wLin) ---
-  FE -->|faucet claim, signed| GQL
-  GQL -->|mint capped wLin to user| WLIN
+  %% Faucet path (wLin)
+  GQL --> WLIN
 
-  %% --- Trade path (wLin <-> token) ---
-  FE -->|approve wLin spend, signed| GQL
-  GQL -->|approve owner to spender| WLIN
+  %% Trade path (wLin <-> token)
+  ME --> WLIN
+  ME --> TOK
 
-  FE -->|trade buy or sell, signed| GQL
-  ME -->|checks allowance and transfers| WLIN
-  ME -->|moves token balances| TOK
-
-  %% --- Demo persistence (repo-backed) ---
-  FE -->|save token metadata + image| API1[Next API<br/>api/tokens]
-  FE -->|append sampled spot prices| API2[Next API<br/>api/prices]
+  %% Demo persistence (repo-backed)
+  FE --> API1[Next API api tokens]
+  FE --> API2[Next API api prices]
   API1 --> FS1[(tokens.gallery.json)]
   API2 --> FS2[(prices.series.json)]
 ```
