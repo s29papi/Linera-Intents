@@ -34,11 +34,11 @@ flowchart LR
   FE -->|connect + sign payloads| MM
 
   %% --- Backend entrypoint ---
-  FE -->|HTTP GraphQL :8080\nqueries + mutations| GQL[Linera GraphQL Service\n`linera service`]
+  FE -->|HTTP GraphQL :8080 (queries + mutations)| GQL[Linera GraphQL Service\nlinera service]
 
   %% --- Linera runtime / storage / network ---
   GQL -->|reads/writes local state| DB[(RocksDB\nwallet.db / table_linera)]
-  GQL -->|sync certs/blobs\n(quorum)| VALS[(Linera Testnet Validators)]
+  GQL -->|sync certs/blobs (quorum)| VALS[(Linera Testnet Validators)]
 
   %% --- On-chain: single chain hosting multiple apps ---
   subgraph CHAIN["Linera Testnet Chain\nCHAIN_ID = 761f62...67ced"]
@@ -57,21 +57,21 @@ flowchart LR
   GQL --> TOK
 
   %% --- Create token path ---
-  FE -->|createToken\n(name/symbol/params + signature)| GQL
-  TF -->|publish module once\ncreate per-token app instance| TOK
-  TF -->|register symbol -> tokenAppId\nstore pool config| ME
+  FE -->|createToken (name/symbol/params + signature)| GQL
+  TF -->|publish module once; create per-token app instance| TOK
+  TF -->|register symbol -> tokenAppId; store pool config| ME
 
   %% --- Faucet path (wLin) ---
-  FE -->|faucet claim\n(signature)| GQL
-  GQL -->|mint capped wLin\n(to user)| WLIN
+  FE -->|faucet claim (signature)| GQL
+  GQL -->|mint capped wLin (to user)| WLIN
 
   %% --- Trade path (wLin <-> token) ---
-  FE -->|approve wLin spend\n(signature)| GQL
-  GQL -->|approve(owner->spender)\nspender = Matching Engine appId| WLIN
+  FE -->|approve wLin spend (signature)| GQL
+  GQL -->|approve(owner->spender); spender = Matching Engine appId| WLIN
 
-  FE -->|trade BUY/SELL\n(amountIn + minOut + signature)| GQL
-  ME -->|checks allowance\nand transfers in/out| WLIN
-  ME -->|transfers/mints token out\nor transfers token in| TOK
+  FE -->|trade BUY/SELL (amountIn + minOut + signature)| GQL
+  ME -->|checks allowance and transfers in/out| WLIN
+  ME -->|transfers/mints token out or transfers token in| TOK
 
   %% --- Demo persistence (repo-backed) ---
   FE -->|save token metadata + image| API1[/Next API\n/api/tokens/]
