@@ -1,11 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { keccak_256 } from '@noble/hashes/sha3';
 
 const TEXT_ENCODER = new TextEncoder();
 const AMOUNT_DECIMALS = 18n;
 const CREATE_TOKEN_TYPE = 'CreateTokenRequest';
+const LS_OWNER = 'linad_owner';
+const LS_WALLET = 'linad_wallet_address';
+
+const DEFAULT_CHAIN_ID = '761f62d709008c57a8eafb9d374522aa13f0a87b68ec4221861c73e0d1b67ced';
+const DEFAULT_TOKEN_FACTORY_APP_ID = 'ff081619d9553ae6919dd0ed2268cd1ad988140275701136fe54805d31027990';
+const DEFAULT_GRAPHQL_ENDPOINT = 'http://127.0.0.1:8080';
+const DEFAULT_DECIMALS = 9;
+const DEFAULT_SUPPLY = '800000000';
 
 function concatBytes(...chunks: Uint8Array[]) {
   const length = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -22,17 +30,6 @@ function bytesToHex(bytes: Uint8Array) {
   return Array.from(bytes)
     .map((value) => value.toString(16).padStart(2, '0'))
     .join('');
-}
-
-function formatWalletLabel(address: string) {
-  const trimmed = address.trim();
-  if (!trimmed) {
-    return '';
-  }
-  if (trimmed.length <= 12) {
-    return trimmed;
-  }
-  return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`;
 }
 
 function hexToBytes(hex: string) {
@@ -53,6 +50,30 @@ function encodeU32LE(value: number) {
   return new Uint8Array(buffer);
 }
 
+function encodeUleb128(value: number) {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error('Invalid ULEB128 value');
+  }
+  const bytes: number[] = [];
+  let remaining = value;
+  do {
+    let byte = remaining & 0x7f;
+    remaining >>>= 7;
+    if (remaining !== 0) {
+      byte |= 0x80;
+    }
+    bytes.push(byte);
+  } while (remaining !== 0);
+  return new Uint8Array(bytes);
+}
+
+function encodeVariantIndex(index: number) {
+  if (!Number.isInteger(index) || index < 0 || index > 255) {
+    throw new Error('Invalid variant index');
+  }
+  return new Uint8Array([index]);
+}
+
 function encodeU128LE(value: bigint) {
   const bytes = new Uint8Array(16);
   let cursor = value;
@@ -65,7 +86,8 @@ function encodeU128LE(value: bigint) {
 
 function encodeString(value: string) {
   const bytes = TEXT_ENCODER.encode(value);
-  return concatBytes(encodeU32LE(bytes.length), bytes);
+  // BCS uses ULEB128 length prefixes for sequences/strings.
+  return concatBytes(encodeUleb128(bytes.length), bytes);
 }
 
 function parseAmountToU128(input: string) {
@@ -93,10 +115,12 @@ function encodeAmount(input: string) {
 function encodeAccountOwner(owner: string) {
   const normalized = owner.trim().toLowerCase().replace(/^0x/, '');
   if (normalized.length === 40) {
-    return concatBytes(encodeU32LE(2), hexToBytes(normalized));
+    // AccountOwner::Address20
+    return concatBytes(encodeVariantIndex(2), hexToBytes(normalized));
   }
   if (normalized.length === 64) {
-    return concatBytes(encodeU32LE(1), hexToBytes(normalized));
+    // AccountOwner::Address32
+    return concatBytes(encodeVariantIndex(1), hexToBytes(normalized));
   }
   throw new Error('Owner must be 20-byte or 32-byte hex');
 }
@@ -124,11 +148,17 @@ function encodeEvmAccountSignature(signatureHex: string, address: string) {
   if (sigBytes.length !== 65) {
     throw new Error('EVM signature must be 65 bytes');
   }
+  // Keep `v` in Ethereum's 27/28 form (this is what Linera's alloy signature parser supports).
+  const v = sigBytes[64];
+  if (v === 0 || v === 1) {
+    sigBytes[64] = v + 27;
+  }
   const addressBytes = hexToBytes(address.trim().toLowerCase().replace(/^0x/, ''));
   if (addressBytes.length !== 20) {
     throw new Error('EVM address must be 20 bytes');
   }
-  return concatBytes(encodeU32LE(2), sigBytes, addressBytes);
+  // AccountSignature::EvmSecp256k1
+  return concatBytes(encodeVariantIndex(2), sigBytes, addressBytes);
 }
 
 const defaultForm = {
@@ -136,12 +166,7 @@ const defaultForm = {
   tokenSymbol: '',
   description: '',
   owner: '0x49c2f87001ec3e39ea5a4dbd115e404c4d4a4641e83c9a60dc3d9e77778f72c1',
-  signature: '',
-  decimals: 9,
-  supply: '800000000',
-  chainId: '761f62d709008c57a8eafb9d374522aa13f0a87b68ec4221861c73e0d1b67ced',
-  tokenFactory: 'ff081619d9553ae6919dd0ed2268cd1ad988140275701136fe54805d31027990',
-  endpoint: 'http://127.0.0.1:8080'
+  signature: ''
 };
 
 export default function Home() {
@@ -149,60 +174,135 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string>('');
   const [walletAddress, setWalletAddress] = useState<string>('');
-  const [walletStatus, setWalletStatus] = useState<string>('');
-  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
-  const walletMenuRef = useRef<HTMLDivElement | null>(null);
+  const [tokenImageFile, setTokenImageFile] = useState<File | null>(null);
+  const [tokenImagePreviewUrl, setTokenImagePreviewUrl] = useState<string>('');
+  const [tokenImageError, setTokenImageError] = useState<string>('');
 
-  useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      if (!walletMenuRef.current) {
-        return;
-      }
-      if (!walletMenuRef.current.contains(event.target as Node)) {
-        setWalletMenuOpen(false);
-      }
+  async function readImageAsDataUrl(file: File) {
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ''));
+      reader.onerror = () => reject(new Error('Failed to read image.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function fetchTokenAppIdForSymbol(symbol: string) {
+    const trimmed = symbol.trim();
+    if (!trimmed) {
+      return '';
     }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+    const endpoint = DEFAULT_GRAPHQL_ENDPOINT.replace(/\/$/, '');
+    const url = `${endpoint}/chains/${DEFAULT_CHAIN_ID}/applications/${DEFAULT_TOKEN_FACTORY_APP_ID}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `query TokenAppId($symbol: String!) {
+          tokenAppId(symbol: $symbol)
+        }`,
+        variables: { symbol: trimmed }
+      })
+    });
+    const json = await response.json();
+    if (json?.errors?.length || (Array.isArray(json?.error) && json.error.length)) {
+      return '';
+    }
+    return String(json?.data?.tokenAppId ?? '');
+  }
 
-  async function connectWallet() {
-    setWalletStatus('');
+  async function waitForTokenAppId(symbol: string) {
+    // The createToken mutation schedules an operation; the registry may not be readable immediately.
+    const maxAttempts = 12;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const tokenAppId = await fetchTokenAppIdForSymbol(symbol);
+      if (tokenAppId) {
+        return tokenAppId;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 400 + attempt * 150));
+    }
+    return '';
+  }
+
+  async function persistCreatedToken(params: { tokenAppId: string; name: string; symbol: string; imageDataUrl?: string }) {
     try {
-      if (typeof window === 'undefined' || !('ethereum' in window)) {
-        setWalletStatus('MetaMask not detected.');
-        return;
-      }
-      const ethereum = (window as Window & { ethereum?: any }).ethereum;
-      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-      const address = Array.isArray(accounts) ? accounts[0] : '';
-      if (!address) {
-        setWalletStatus('No account available.');
-        return;
-      }
-      setWalletAddress(address);
-      updateField('owner', address);
-      setWalletStatus(`Connected: ${address}`);
-    } catch (error) {
-      setWalletStatus(String(error));
+      await fetch('/api/tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokenAppId: params.tokenAppId,
+          name: params.name,
+          symbol: params.symbol,
+          imageDataUrl: params.imageDataUrl ?? '',
+          createdAt: Date.now()
+        })
+      });
+    } catch {
+      // ignore (still stored in localStorage)
     }
   }
 
-  async function signWithMetaMask() {
+  useEffect(() => {
+    function syncWalletFromStorage() {
+      try {
+        const storedWallet = window.localStorage.getItem(LS_WALLET) ?? '';
+        const storedOwner = window.localStorage.getItem(LS_OWNER) ?? '';
+        setWalletAddress(storedWallet);
+        if (storedOwner && storedOwner !== defaultForm.owner) {
+          setForm((prev) => ({ ...prev, owner: storedOwner }));
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    function onStorage(event: StorageEvent) {
+      if (event.key !== LS_OWNER && event.key !== LS_WALLET) {
+        return;
+      }
+      syncWalletFromStorage();
+    }
+
+    syncWalletFromStorage();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('linad_owner_changed', syncWalletFromStorage as EventListener);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('linad_owner_changed', syncWalletFromStorage as EventListener);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (tokenImagePreviewUrl) {
+        URL.revokeObjectURL(tokenImagePreviewUrl);
+      }
+    };
+  }, [tokenImagePreviewUrl]);
+
+  async function signWithMetaMask(requestOwner: string) {
+    const trimmedOwner = requestOwner.trim();
+    if (!trimmedOwner) {
+      throw new Error('Missing owner.');
+    }
     if (!walletAddress) {
       throw new Error('Connect MetaMask first.');
     }
     const owner = walletAddress;
-    if (form.owner.trim().toLowerCase() !== owner.toLowerCase()) {
-      updateField('owner', owner);
+    // Ensure we sign what we'll send to the chain.
+    if (trimmedOwner.toLowerCase() !== owner.toLowerCase()) {
+      throw new Error('Owner must match connected MetaMask address.');
     }
     const payloadBytes = encodeCreateTokenRequest({
       owner,
       name: form.tokenName.trim(),
       symbol: form.tokenSymbol.trim(),
-      decimals: Number(form.decimals || 0),
-      supply: String(form.supply).trim()
+      decimals: DEFAULT_DECIMALS,
+      supply: DEFAULT_SUPPLY
     });
+    // Linera hashes/signs as: keccak256("{TypeName}::" || bcs(payload)).
+    // Then MetaMask `personal_sign` applies EIP-191 over that 32-byte hash.
     const domain = TEXT_ENCODER.encode(`${CREATE_TOKEN_TYPE}::`);
     const hash = keccak_256(concatBytes(domain, payloadBytes));
     const messageHex = `0x${bytesToHex(hash)}`;
@@ -212,6 +312,17 @@ export default function Home() {
       method: 'personal_sign',
       params: [messageHex, owner]
     });
+    // Debug helper: lets you copy/paste the raw signature and inspect `v` (last byte).
+    // NOTE: Remove before production.
+    try {
+      const sigNo0x = String(rawSignature || '').replace(/^0x/i, '');
+      const vHex = sigNo0x.length >= 2 ? sigNo0x.slice(-2) : '';
+      // eslint-disable-next-line no-console
+      console.log('[createToken] personal_sign', { owner, messageHex, vHex, rawSignature });
+      (window as any).__linad_last_personal_sign = { owner, messageHex, vHex, rawSignature };
+    } catch {
+      // ignore
+    }
     const signatureHex = bytesToHex(encodeEvmAccountSignature(rawSignature, owner));
     updateField('signature', signatureHex);
     return signatureHex;
@@ -223,32 +334,87 @@ export default function Home() {
     setResult('');
 
     try {
-      const signature = form.signature.trim() || (walletAddress ? await signWithMetaMask() : '');
+      const requestOwner = (walletAddress || form.owner).trim();
+      if (!requestOwner) {
+        throw new Error('Owner is required. Connect MetaMask first.');
+      }
+      const signature = form.signature.trim() || (walletAddress ? await signWithMetaMask(requestOwner) : '');
       if (!signature) {
-        throw new Error('Signature is required. Connect MetaMask or paste a signature hex.');
+        throw new Error('Signature is required. Connect MetaMask to sign the request.');
       }
       const mutationBody = {
         query: `mutation CreateToken($owner: String!, $name: String!, $symbol: String!, $decimals: Int!, $supply: String!, $sig: String!) {
           createToken(request: { payload: { owner: $owner, metadata: { name: $name, symbol: $symbol, decimals: $decimals }, initialSupply: $supply }, signatureHex: $sig })
         }`,
         variables: {
-          owner: form.owner.trim(),
+          owner: requestOwner,
           name: form.tokenName.trim(),
           symbol: form.tokenSymbol.trim(),
-          decimals: Number(form.decimals || 0),
-          supply: String(form.supply).trim(),
+          decimals: DEFAULT_DECIMALS,
+          supply: DEFAULT_SUPPLY,
           sig: signature
         }
       };
-      const endpoint = form.endpoint.replace(/\/$/, '');
-      const url = `${endpoint}/chains/${form.chainId}/applications/${form.tokenFactory}`;
+      const endpoint = DEFAULT_GRAPHQL_ENDPOINT.replace(/\/$/, '');
+      const url = `${endpoint}/chains/${DEFAULT_CHAIN_ID}/applications/${DEFAULT_TOKEN_FACTORY_APP_ID}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mutationBody)
       });
       const json = await response.json();
-      setResult(JSON.stringify(json, null, 2));
+
+      let tokenAppId = '';
+      try {
+        const hasGraphQlErrors = Boolean(json?.errors?.length || (Array.isArray(json?.error) && json.error.length));
+        // Some Linera service responses return `data` as a scalar (e.g. certificate hash). Treat "no errors" as success.
+        const createOk = response.ok && !hasGraphQlErrors;
+        if (createOk) {
+          tokenAppId = await waitForTokenAppId(form.tokenSymbol);
+        }
+      } catch {
+        tokenAppId = '';
+      }
+
+      let imageDataUrl = '';
+      try {
+        if (tokenAppId && tokenImageFile) {
+          const dataUrl = await readImageAsDataUrl(tokenImageFile);
+          imageDataUrl = dataUrl;
+        }
+      } catch {
+        imageDataUrl = '';
+      }
+
+      if (tokenAppId) {
+        const record = {
+          tokenAppId,
+          name: form.tokenName.trim(),
+          symbol: form.tokenSymbol.trim(),
+          imageDataUrl
+        };
+        void persistCreatedToken(record);
+      }
+
+      const resultPayload = tokenAppId ? { ...json, tokenAppId } : json;
+      setResult(JSON.stringify(resultPayload, null, 2));
+
+      // Clear user inputs after success, but keep the result visible.
+      if (response.ok && !(json?.errors?.length || (Array.isArray(json?.error) && json.error.length))) {
+        if (tokenImagePreviewUrl) {
+          URL.revokeObjectURL(tokenImagePreviewUrl);
+        }
+        setTokenImageFile(null);
+        setTokenImagePreviewUrl('');
+        setTokenImageError('');
+        setForm((prev) => ({
+          ...prev,
+          tokenName: '',
+          tokenSymbol: '',
+          description: '',
+          signature: ''
+        }));
+      }
     } catch (error) {
       setResult(String(error));
     } finally {
@@ -260,52 +426,8 @@ export default function Home() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleWalletButtonClick() {
-    if (!walletAddress) {
-      void connectWallet();
-      return;
-    }
-    setWalletMenuOpen((open) => !open);
-  }
-
-  function disconnectWallet() {
-    setWalletAddress('');
-    setWalletStatus('');
-    setWalletMenuOpen(false);
-    updateField('owner', defaultForm.owner);
-    updateField('signature', '');
-  }
-
   return (
     <main className="relative min-h-screen px-6 py-16">
-      <div className="absolute right-6 top-6 z-10 flex items-center gap-3">
-        <a
-          href="/faucet"
-          className="rounded-xl border border-slate-700/80 bg-slate-950/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-brand/70 hover:text-brand"
-        >
-          wLin Faucet
-        </a>
-        <div ref={walletMenuRef} className="relative">
-          <button
-            type="button"
-          onClick={handleWalletButtonClick}
-          className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-brand-dark"
-        >
-          {walletAddress ? formatWalletLabel(walletAddress) : 'Connect Wallet'}
-        </button>
-        {walletAddress && walletMenuOpen ? (
-          <div className="absolute right-0 mt-2 w-40 rounded-xl border border-slate-800/80 bg-slate-950/95 p-2 shadow-xl">
-            <button
-              type="button"
-              onClick={disconnectWallet}
-              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:bg-slate-900/60"
-            >
-              Disconnect
-            </button>
-          </div>
-        ) : null}
-        </div>
-      </div>
       <section className="mx-auto w-full max-w-4xl rounded-3xl border border-slate-800/70 bg-slate-950/90 p-10 shadow-glow">
         <div className="text-center">
           <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Linad.fun</p>
@@ -315,11 +437,55 @@ export default function Home() {
 
         <form onSubmit={submitToken} className="mt-10 grid gap-6">
           <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-            <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-700/70 px-4 py-8 text-center text-xs text-slate-400">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 text-brand">+</span>
-              PNG · JPEG · WEBP · GIF
-              <span className="text-[11px] text-slate-500">Max size 5MB</span>
-              <input type="file" className="hidden" />
+            <label className="relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-dashed border-slate-700/70 px-4 py-8 text-center text-xs text-slate-400">
+              {tokenImagePreviewUrl ? (
+                <img
+                  src={tokenImagePreviewUrl}
+                  alt="Token preview"
+                  className="absolute inset-0 h-full w-full object-cover opacity-70"
+                />
+              ) : null}
+              <span className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-slate-950/70 text-brand">
+                +
+              </span>
+              <span className="relative">
+                {tokenImageFile ? `Selected: ${tokenImageFile.name}` : 'PNG · JPEG · WEBP · GIF'}
+              </span>
+              <span className="relative text-[11px] text-slate-500">
+                {tokenImageError ? tokenImageError : 'Max size 5MB'}
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                className="absolute inset-0 cursor-pointer opacity-0"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  setTokenImageError('');
+                  if (!file) {
+                    setTokenImageFile(null);
+                    if (tokenImagePreviewUrl) {
+                      URL.revokeObjectURL(tokenImagePreviewUrl);
+                    }
+                    setTokenImagePreviewUrl('');
+                    return;
+                  }
+                  if (file.size > 5 * 1024 * 1024) {
+                    setTokenImageError('File too large (max 5MB).');
+                    event.target.value = '';
+                    return;
+                  }
+                  if (!file.type.startsWith('image/')) {
+                    setTokenImageError('Unsupported file type.');
+                    event.target.value = '';
+                    return;
+                  }
+                  if (tokenImagePreviewUrl) {
+                    URL.revokeObjectURL(tokenImagePreviewUrl);
+                  }
+                  setTokenImageFile(file);
+                  setTokenImagePreviewUrl(URL.createObjectURL(file));
+                }}
+              />
             </label>
 
             <div className="grid gap-4">
@@ -382,93 +548,8 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/70 bg-slate-900/40 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-200">Advanced</p>
-                <p className="text-xs text-slate-400">Required fields for createToken mutation.</p>
-              </div>
-              <span className="text-xs text-brand">cli.sh parity</span>
-            </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="grid gap-3 md:col-span-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Wallet</label>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={signWithMetaMask}
-                    className="rounded-xl border border-brand/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-brand transition hover:bg-brand/10"
-                  >
-                    Sign Payload
-                  </button>
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Owner</label>
-                <input
-                  className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/30"
-                  value={form.owner}
-                  onChange={(event) => updateField('owner', event.target.value)}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Signature Hex</label>
-                <input
-                  className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/30"
-                  value={form.signature}
-                  onChange={(event) => updateField('signature', event.target.value)}
-                />
-                <p className="text-[11px] text-slate-500">
-                  Leave empty to sign with MetaMask (EVM address owner).
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Decimals</label>
-                <input
-                  type="number"
-                  className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm"
-                  value={form.decimals}
-                  onChange={(event) => updateField('decimals', Number(event.target.value))}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Initial Supply</label>
-                <input
-                  className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm"
-                  value={form.supply}
-                  onChange={(event) => updateField('supply', event.target.value)}
-                />
-              </div>
-              <div className="grid gap-2 md:col-span-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Chain ID</label>
-                <input
-                  className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm"
-                  value={form.chainId}
-                  onChange={(event) => updateField('chainId', event.target.value)}
-                />
-              </div>
-              <div className="grid gap-2 md:col-span-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Token Factory App ID</label>
-                <input
-                  className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm"
-                  value={form.tokenFactory}
-                  onChange={(event) => updateField('tokenFactory', event.target.value)}
-                />
-              </div>
-              <div className="grid gap-2 md:col-span-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">GraphQL Endpoint</label>
-                <input
-                  className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm"
-                  value={form.endpoint}
-                  onChange={(event) => updateField('endpoint', event.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
           <div className="mt-4 flex flex-col items-center gap-3">
-            <p className="text-xs text-slate-500">Cost to deploy: 0.01 BNB</p>
+            <p className="text-xs text-slate-500">Free deployment</p>
             <button
               type="submit"
               className="w-full rounded-2xl bg-brand px-6 py-4 text-sm font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-brand-dark"

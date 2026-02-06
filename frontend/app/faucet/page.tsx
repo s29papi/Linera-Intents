@@ -2,22 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-function formatWalletLabel(address: string) {
-  const trimmed = address.trim();
-  if (!trimmed) {
-    return '';
-  }
-  if (trimmed.length <= 12) {
-    return trimmed;
-  }
-  return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`;
-}
-
 const defaultForm = {
   amount: '1000',
   owner: '',
   chainId: '761f62d709008c57a8eafb9d374522aa13f0a87b68ec4221861c73e0d1b67ced',
   faucetAppId: '5531238ece651244a3dfab368d5f9ae7c0fe5641c2fc70384e75ef3a427fd1f1',
+  wlinAppId: '6a570896ff23d7a1db44398bae8b2ad12101af56cd244a7d694ed94ead048731',
   endpoint: 'http://127.0.0.1:8080'
 };
 
@@ -25,66 +15,52 @@ export default function FaucetPage() {
   const [form, setForm] = useState(defaultForm);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string>('');
-  const [walletAddress, setWalletAddress] = useState<string>('');
-  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
-  const walletMenuRef = useRef<HTMLDivElement | null>(null);
+  const [resultOk, setResultOk] = useState<boolean | null>(null);
+  const lastAutoOwnerRef = useRef<string>('');
 
   useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      if (!walletMenuRef.current) {
-        return;
+    // Seed owner from persisted value (TopBar writes to localStorage).
+    try {
+      const savedOwner = window.localStorage.getItem('linad_owner') ?? '';
+      if (savedOwner) {
+        lastAutoOwnerRef.current = savedOwner;
+        setForm((prev) => ({ ...prev, owner: savedOwner }));
       }
-      if (!walletMenuRef.current.contains(event.target as Node)) {
-        setWalletMenuOpen(false);
+    } catch {
+      // ignore
+    }
+
+    function onOwnerChanged() {
+      try {
+        const savedOwner = window.localStorage.getItem('linad_owner') ?? '';
+        if (!savedOwner) {
+          return;
+        }
+        setForm((prev) => {
+          if (!prev.owner || prev.owner === lastAutoOwnerRef.current) {
+            lastAutoOwnerRef.current = savedOwner;
+            return { ...prev, owner: savedOwner };
+          }
+          return prev;
+        });
+      } catch {
+        // ignore
       }
     }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+
+    window.addEventListener('linad_owner_changed', onOwnerChanged as EventListener);
+    return () => window.removeEventListener('linad_owner_changed', onOwnerChanged as EventListener);
   }, []);
 
   function updateField<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function connectWallet() {
-    try {
-      if (typeof window === 'undefined' || !('ethereum' in window)) {
-        setResult('MetaMask not detected.');
-        return;
-      }
-      const ethereum = (window as Window & { ethereum?: any }).ethereum;
-      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-      const address = Array.isArray(accounts) ? accounts[0] : '';
-      if (!address) {
-        setResult('No account available.');
-        return;
-      }
-      setWalletAddress(address);
-      updateField('owner', address);
-      setResult('');
-    } catch (error) {
-      setResult(String(error));
-    }
-  }
-
-  function handleWalletButtonClick() {
-    if (!walletAddress) {
-      void connectWallet();
-      return;
-    }
-    setWalletMenuOpen((open) => !open);
-  }
-
-  function disconnectWallet() {
-    setWalletAddress('');
-    setWalletMenuOpen(false);
-    updateField('owner', defaultForm.owner);
-  }
-
   async function submitMint(event: React.FormEvent) {
     event.preventDefault();
     setSubmitting(true);
     setResult('');
+    setResultOk(null);
 
     try {
       const amount = form.amount.trim();
@@ -112,9 +88,14 @@ export default function FaucetPage() {
         body: JSON.stringify(mutationBody)
       });
       const json = await response.json();
+      const hasGraphQlErrors = Array.isArray(json?.errors) && json.errors.length > 0;
+      const hasLineraErrorField = Array.isArray(json?.error) && json.error.length > 0;
+      setResultOk(Boolean(response.ok) && !hasGraphQlErrors && !hasLineraErrorField);
       setResult(JSON.stringify(json, null, 2));
+      window.dispatchEvent(new Event('linad_refresh_balance'));
     } catch (error) {
       setResult(String(error));
+      setResultOk(false);
     } finally {
       setSubmitting(false);
     }
@@ -122,35 +103,6 @@ export default function FaucetPage() {
 
   return (
     <main className="relative min-h-screen px-6 py-16">
-      <div className="absolute right-6 top-6 z-10 flex items-center gap-3">
-        <a
-          href="/"
-          className="rounded-xl border border-slate-700/80 bg-slate-950/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-brand/70 hover:text-brand"
-        >
-          Launchpad
-        </a>
-        <div ref={walletMenuRef} className="relative">
-          <button
-            type="button"
-            onClick={handleWalletButtonClick}
-            className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-brand-dark"
-          >
-            {walletAddress ? formatWalletLabel(walletAddress) : 'Connect Wallet'}
-          </button>
-          {walletAddress && walletMenuOpen ? (
-            <div className="absolute right-0 mt-2 w-40 rounded-xl border border-slate-800/80 bg-slate-950/95 p-2 shadow-xl">
-              <button
-                type="button"
-                onClick={disconnectWallet}
-                className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:bg-slate-900/60"
-              >
-                Disconnect
-              </button>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
       <section className="mx-auto mt-10 w-full max-w-3xl rounded-3xl border border-slate-800/70 bg-slate-950/90 p-10 shadow-glow">
         <div className="text-center">
           <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Linad.fun</p>
@@ -178,7 +130,16 @@ export default function FaucetPage() {
             <input
               className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/30"
               value={form.owner}
-              onChange={(event) => updateField('owner', event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value;
+                updateField('owner', value);
+                try {
+                  window.localStorage.setItem('linad_owner', value);
+                } catch {
+                  // ignore
+                }
+                window.dispatchEvent(new Event('linad_owner_changed'));
+              }}
               placeholder="Paste wallet address (0x...)"
               required
             />
@@ -195,9 +156,62 @@ export default function FaucetPage() {
         </form>
 
         {result ? (
-          <div className="mt-8 rounded-2xl border border-slate-800/80 bg-slate-950/60 p-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Result</p>
-            <pre className="mt-3 whitespace-pre-wrap text-xs text-slate-200">{result}</pre>
+          <div
+            className={[
+              'mt-8 rounded-2xl border bg-slate-950/60 p-6',
+              resultOk === true ? 'border-emerald-500/60' : '',
+              resultOk === false ? 'border-red-500/60' : '',
+              resultOk === null ? 'border-slate-800/80' : ''
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                {resultOk === true ? (
+                  <span
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-300"
+                    aria-label="Success"
+                    title="Success"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="M20 6L9 17l-5-5"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                ) : null}
+                {resultOk === false ? (
+                  <span
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-red-500/15 text-red-300"
+                    aria-label="Failed"
+                    title="Failed"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="M18 6L6 18M6 6l12 12"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                ) : null}
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Result</p>
+              </div>
+              {resultOk === true ? (
+                <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Success</span>
+              ) : null}
+              {resultOk === false ? (
+                <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-red-300">Failed</span>
+              ) : null}
+            </div>
+            <pre className="mt-4 whitespace-pre-wrap text-xs text-slate-200">{result}</pre>
           </div>
         ) : null}
       </section>

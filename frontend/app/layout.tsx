@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Space_Grotesk } from 'next/font/google';
+import TopBar from './components/top-bar';
 import './globals.css';
 
 const spaceGrotesk = Space_Grotesk({
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={spaceGrotesk.variable}>
       <body className="font-display bg-slate-950 text-slate-100">
+        <TopBar />
         {children}
       </body>
     </html>
