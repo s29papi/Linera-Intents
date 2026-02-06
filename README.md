@@ -28,4 +28,8 @@ docker compose up --force-recreate
 
 Then open:
 - Frontend: `http://127.0.0.1:5173`
+  - `/` (Launchpad): create a new token (Token Factory)
+  - `/explore` (Explore): browse created tokens
+  - `/explore/[tokenAppId]` (Token Details): token chart + buy/sell trading
+  - `/faucet` (wLin Faucet): mint a capped amount of wLin to your wallet
 - Linera GraphQL (GraphiQL): `http://127.0.0.1:8080`
