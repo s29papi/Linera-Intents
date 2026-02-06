@@ -23,6 +23,63 @@ We built it this way because Linera lets multiple apps live on a single chain wh
 - `FAUCET_APP_ID` — `5531238ece651244a3dfab368d5f9ae7c0fe5641c2fc70384e75ef3a427fd1f1`
 - `WLIN_APP_ID` — `6a570896ff23d7a1db44398bae8b2ad12101af56cd244a7d694ed94ead048731`
 
+### Architecture
+
+```mermaid
+flowchart LR
+  %% --- Client side ---
+  U[User] --> FE[Next.js Frontend\nLaunchpad / Explore / Token Details]
+  U --> MM[MetaMask\nsecp256k1 signatures]
+
+  FE -->|connect + sign payloads| MM
+
+  %% --- Backend entrypoint ---
+  FE -->|HTTP GraphQL :8080\nqueries + mutations| GQL[Linera GraphQL Service\n`linera service`]
+
+  %% --- Linera runtime / storage / network ---
+  GQL -->|reads/writes local state| DB[(RocksDB\nwallet.db / table_linera)]
+  GQL -->|sync certs/blobs\n(quorum)| VALS[(Linera Testnet Validators)]
+
+  %% --- On-chain: single chain hosting multiple apps ---
+  subgraph CHAIN["Linera Testnet Chain\nCHAIN_ID = 761f62...67ced"]
+    direction TB
+
+    TF[Token Factory Contract\n(createToken)]
+    ME[Matching Engine Contract\n(pool + buy/sell settlement)]
+    WLIN[WLIN Fungible Token Contract\n(mint/transfer/approve)]
+    TOK[Per-Token Fungible Token Contract\n(one app instance per symbol)]
+  end
+
+  %% --- How the service reaches contracts ---
+  GQL --> TF
+  GQL --> ME
+  GQL --> WLIN
+  GQL --> TOK
+
+  %% --- Create token path ---
+  FE -->|createToken\n(name/symbol/params + signature)| GQL
+  TF -->|publish module once\ncreate per-token app instance| TOK
+  TF -->|register symbol -> tokenAppId\nstore pool config| ME
+
+  %% --- Faucet path (wLin) ---
+  FE -->|faucet claim\n(signature)| GQL
+  GQL -->|mint capped wLin\n(to user)| WLIN
+
+  %% --- Trade path (wLin <-> token) ---
+  FE -->|approve wLin spend\n(signature)| GQL
+  GQL -->|approve(owner->spender)\nspender = Matching Engine appId| WLIN
+
+  FE -->|trade BUY/SELL\n(amountIn + minOut + signature)| GQL
+  ME -->|checks allowance\nand transfers in/out| WLIN
+  ME -->|transfers/mints token out\nor transfers token in| TOK
+
+  %% --- Demo persistence (repo-backed) ---
+  FE -->|save token metadata + image| API1[/Next API\n/api/tokens/]
+  FE -->|append sampled spot prices| API2[/Next API\n/api/prices/]
+  API1 --> FS1[(tokens.gallery.json)]
+  API2 --> FS2[(prices.series.json)]
+```
+
 ## Whats Next ?
 
 - Host the app to provide a stable live URL.
