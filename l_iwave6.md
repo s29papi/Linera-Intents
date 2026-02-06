@@ -71,6 +71,18 @@ graph LR
   API2 --> FS2[(prices.series.json)]
 ```
 
+### Component Notes
+
+- Next.js Frontend (Launchpad / Explore / Token Details): UI to create tokens, explore created tokens, and trade; persistent top navigation + wallet connection; token details view with chart + trade panel.
+- MetaMask Signing (Client Auth): MetaMask signs create-token and trade payloads; frontend enforces owner == connected wallet before submitting.
+- Linera GraphQL Service (Backend Interface): Runs `linera service` on Conway testnet and exposes GraphQL on port `8080`; proposes blocks for app mutations and serves app queries.
+- Docker Testnet Runner (`run.bash` + Compose): Reproducible startup for GraphQL + frontend; fixes storage namespace/init issues so the service boots reliably in Docker.
+- Token Factory Contract (On-chain): Creates one per-token fungible app instance per symbol; enforces unique symbols; returns the token app id for the UI to persist/display.
+- Matching Engine Contract (On-chain): Maintains pool config/reserves and executes buy/sell in wLin; enforces `minOut` slippage protection.
+- wLin Faucet + Fungible Token Apps (On-chain): Faucet mints capped wLin for demo usage; fungible apps provide balances + allowances used by trading.
+- Repo-backed Demo Persistence: `tokens.gallery.json` stores token metadata + image per `tokenAppId`; `prices.series.json` stores per-token price samples used to build candles and charts.
+- Price Charting: 1-minute OHLC candles derived from stored spot samples; SVG candlestick renderer as a reliable fallback when canvas-based charting is inconsistent.
+
 ## Whats Next ?
 
 - Host the app to provide a stable live URL.
