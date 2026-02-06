@@ -28,26 +28,26 @@ We built it this way because Linera lets multiple apps live on a single chain wh
 ```mermaid
 flowchart LR
   %% --- Client side ---
-  U[User] --> FE[Next.js Frontend\nLaunchpad / Explore / Token Details]
-  U --> MM[MetaMask\nsecp256k1 signatures]
+  U[User] --> FE[Next.js Frontend<br/>Launchpad / Explore / Token Details]
+  U --> MM[MetaMask<br/>secp256k1 signatures]
 
   FE -->|connect + sign payloads| MM
 
   %% --- Backend entrypoint ---
-  FE -->|HTTP GraphQL 8080| GQL[Linera GraphQL Service\nlinera service]
+  FE -->|HTTP GraphQL 8080| GQL[Linera GraphQL Service<br/>linera service]
 
   %% --- Linera runtime / storage / network ---
-  GQL -->|reads and writes local state| DB[(RocksDB\nwallet.db / table_linera)]
+  GQL -->|reads and writes local state| DB[(RocksDB<br/>wallet.db / table_linera)]
   GQL -->|sync certs and blobs, quorum| VALS[(Linera Testnet Validators)]
 
   %% --- On-chain: single chain hosting multiple apps ---
-  subgraph CHAIN["Linera Testnet Chain\nCHAIN_ID = 761f62...67ced"]
+  subgraph CHAIN["Linera Testnet Chain<br/>CHAIN_ID = 761f62...67ced"]
     direction TB
 
-    TF[Token Factory Contract\n(createToken)]
-    ME[Matching Engine Contract\n(pool + buy/sell settlement)]
-    WLIN[WLIN Fungible Token Contract\n(mint/transfer/approve)]
-    TOK[Per-Token Fungible Token Contract\n(one app instance per symbol)]
+    TF[Token Factory Contract<br/>(createToken)]
+    ME[Matching Engine Contract<br/>(pool + buy/sell settlement)]
+    WLIN[WLIN Fungible Token Contract<br/>(mint/transfer/approve)]
+    TOK[Per-Token Fungible Token Contract<br/>(one app instance per symbol)]
   end
 
   %% --- How the service reaches contracts ---
@@ -74,8 +74,8 @@ flowchart LR
   ME -->|moves token balances| TOK
 
   %% --- Demo persistence (repo-backed) ---
-  FE -->|save token metadata + image| API1[/Next API\n/api/tokens/]
-  FE -->|append sampled spot prices| API2[/Next API\n/api/prices/]
+  FE -->|save token metadata + image| API1[Next API<br/>api/tokens]
+  FE -->|append sampled spot prices| API2[Next API<br/>api/prices]
   API1 --> FS1[(tokens.gallery.json)]
   API2 --> FS2[(prices.series.json)]
 ```
